@@ -1,11 +1,7 @@
-## app.py — versão final
-
-```python
 import streamlit as st
 import ccxt
 import pandas as pd
 import ta
-import time
 from datetime import datetime
 
 st.set_page_config(page_title="Radar 1M - Tiro Supremo", layout="wide")
@@ -25,9 +21,7 @@ def calcular_sinal(df):
 
     avg_range = (df['high'] - df['low']).rolling(20).mean().iloc[-2]
 
-    # Candle FECHADO (-2) — elimina Sinal Fantasma (repaint)
     tendencia_alta = df['close'].iloc[-2] > ema_fast.iloc[-2]
-    # ema_slow como filtro macro de tendência
     tendencia_macro = ema_fast.iloc[-2] > ema_slow.iloc[-2]
 
     last_range = df['high'].iloc[-2] - df['low'].iloc[-2]
@@ -65,49 +59,30 @@ def get_data(symbol):
         st.warning(f"⚠️ {symbol} — {e}")
         return None
 
-moedas = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT']
-cols = st.columns(4)
+@st.fragment(run_every="30s")
+def painel():
+    moedas = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT']
+    cols = st.columns(4)
 
-for i, coin in enumerate(moedas):
-    with cols[i]:
-        dados = get_data(coin)
-        if dados is not None:
-            status, cor = calcular_sinal(dados)
-            preco_atual = dados['close'].iloc[-1]
-            ultimo_candle = dados['timestamp'].iloc[-2]
+    for i, coin in enumerate(moedas):
+        with cols[i]:
+            dados = get_data(coin)
+            if dados is not None:
+                status, cor = calcular_sinal(dados)
+                preco_atual = dados['close'].iloc[-1]
+                ultimo_candle = dados['timestamp'].iloc[-2]
 
-            st.subheader(f"💰 {coin}")
-            st.metric("Preço", f"${preco_atual:,.2f}")
-            st.markdown(
-                f"<h2 style='color:{cor};'>{status}</h2>",
-                unsafe_allow_html=True
-            )
-            st.caption(f"Candle fechado: {ultimo_candle}")
-        else:
-            st.warning(f"⏳ {coin} — aguardando dados...")
+                st.subheader(f"💰 {coin}")
+                st.metric("Preço", f"${preco_atual:,.2f}")
+                st.markdown(
+                    f"<h2 style='color:{cor};'>{status}</h2>",
+                    unsafe_allow_html=True
+                )
+                st.caption(f"Candle fechado: {ultimo_candle}")
+            else:
+                st.warning(f"⏳ {coin} — aguardando dados...")
 
-agora = datetime.now().strftime("%H:%M:%S")
-st.caption(f"🕐 Última atualização: {agora} · Próxima em 30s")
+    agora = datetime.now().strftime("%H:%M:%S")
+    st.caption(f"🕐 Última atualização: {agora} · Próxima em 30s")
 
-time.sleep(30)
-st.rerun()
-```
-
----
-
-## requirements.txt
-
-```
-streamlit==1.45.1
-ccxt==4.2.82
-pandas==2.2.0
-ta==0.11.0
-```
-
----
-
-**3 mudanças aplicadas:**
-
-- `iloc[-2]` em todo `calcular_sinal` — candle fechado, zero repaint
-- `ema_slow` integrada como filtro macro (`tendencia_macro`) — código morto eliminado
-- `except Exception as e` com `st.warning` — erros visíveis sem travar o app
+painel()
