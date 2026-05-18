@@ -9,7 +9,7 @@ st.title("🎯 Analista de Mercado 1M - Estratégia Futura")
 
 @st.cache_resource
 def get_exchange():
-    exchange = ccxt.binanceusdm({
+    exchange = ccxt.binance({        # ← CORREÇÃO AQUI
         "enableRateLimit": True,
         "timeout": 10000,
     })
