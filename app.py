@@ -4,15 +4,15 @@ import pandas as pd
 import ta
 from datetime import datetime
 
-st.set_page_config(page_title="Radar 1M - Tiro Supremo", layout="wide")
-st.title("🎯 Analista de Mercado 1M - Estratégia Futura")
+st.set_page_config(page_title="Radar OKX-Futura Broker", layout="wide")
+st.title("🎯 Radar OKX-Futura Broker")
 
 @st.cache_resource
 def get_exchange():
     return ccxt.okx({
         "enableRateLimit": True,
         "timeout": 15000,
-        "options": {"defaultType": "spot"}
+        "options": {"defaultType": "swap"}
     })
 
 def calcular_sinal(df):
@@ -64,7 +64,7 @@ def get_data(symbol):
 
 @st.fragment(run_every="30s")
 def painel():
-    moedas = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT']
+    moedas = ['BTC/USDT:USDT', 'ETH/USDT:USDT', 'SOL/USDT:USDT', 'BNB/USDT:USDT']
     cols = st.columns(4)
 
     for i, coin in enumerate(moedas):
@@ -74,8 +74,9 @@ def painel():
                 status, cor = calcular_sinal(dados)
                 preco_atual = dados['close'].iloc[-1]
                 ultimo_candle = dados['timestamp'].iloc[-2]
+                nome = coin.split(':')[0]
 
-                st.subheader(f"💰 {coin}")
+                st.subheader(f"💰 {nome}")
                 st.metric("Preço", f"${preco_atual:,.2f}")
                 st.markdown(
                     f"<h2 style='color:{cor};'>{status}</h2>",
@@ -83,7 +84,7 @@ def painel():
                 )
                 st.caption(f"Candle fechado: {ultimo_candle}")
             else:
-                st.warning(f"⏳ {coin} — aguardando dados...")
+                st.warning(f"⏳ {coin.split(':')[0]} — aguardando dados...")
 
     agora = datetime.now().strftime("%H:%M:%S")
     st.caption(f"🕐 Última atualização: {agora} · Próxima em 30s")
