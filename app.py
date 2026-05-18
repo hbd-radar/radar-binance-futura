@@ -9,7 +9,7 @@ st.title("🎯 Analista de Mercado 1M - Estratégia Futura")
 
 @st.cache_resource
 def get_exchange():
-    exchange = ccxt.binance({        # ← CORREÇÃO AQUI
+    exchange = ccxt.bybit({        # ← BYBIT (sem bloqueio geo)
         "enableRateLimit": True,
         "timeout": 10000,
     })
