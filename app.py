@@ -9,13 +9,11 @@ st.title("🎯 Analista de Mercado 1M - Estratégia Futura")
 
 @st.cache_resource
 def get_exchange():
-    return ccxt.okx({
+    exchange = ccxt.bybit({
         "enableRateLimit": True,
-        "timeout": 15000,
-        "options": {
-            "defaultType": "spot"
-        }
+        "timeout": 10000,
     })
+    return exchange
 
 def calcular_sinal(df):
     ema_fast = ta.trend.ema_indicator(df['close'], window=10)
@@ -53,6 +51,7 @@ def get_data(symbol):
             return None
 
         df = pd.DataFrame(bars, columns=['time', 'open', 'high', 'low', 'close', 'vol'])
+        df[['open','high','low','close','vol']] = df[['open','high','low','close','vol']].apply(pd.to_numeric)
         df['timestamp'] = pd.to_datetime(df['time'], unit='ms').dt.strftime('%H:%M')
 
         return df
@@ -63,7 +62,7 @@ def get_data(symbol):
 
 @st.fragment(run_every="30s")
 def painel():
-    moedas = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT']
+    moedas = ['BTC/USDT:USDT', 'ETH/USDT:USDT', 'SOL/USDT:USDT', 'BNB/USDT:USDT']
     cols = st.columns(4)
 
     for i, coin in enumerate(moedas):
@@ -73,8 +72,9 @@ def painel():
                 status, cor = calcular_sinal(dados)
                 preco_atual = dados['close'].iloc[-1]
                 ultimo_candle = dados['timestamp'].iloc[-2]
+                nome = coin.split(':')[0]
 
-                st.subheader(f"💰 {coin}")
+                st.subheader(f"💰 {nome}")
                 st.metric("Preço", f"${preco_atual:,.2f}")
                 st.markdown(
                     f"<h2 style='color:{cor};'>{status}</h2>",
@@ -82,7 +82,7 @@ def painel():
                 )
                 st.caption(f"Candle fechado: {ultimo_candle}")
             else:
-                st.warning(f"⏳ {coin} — aguardando dados...")
+                st.warning(f"⏳ {coin.split(':')[0]} — aguardando dados...")
 
     agora = datetime.now().strftime("%H:%M:%S")
     st.caption(f"🕐 Última atualização: {agora} · Próxima em 30s")
