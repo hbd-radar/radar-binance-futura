@@ -9,17 +9,19 @@ st.title("🎯 Analista de Mercado 1M - Estratégia Futura")
 
 @st.cache_resource
 def get_exchange():
-    exchange = ccxt.bybit({
+    return ccxt.okx({
         "enableRateLimit": True,
-        "timeout": 10000,
+        "timeout": 15000,
+        "options": {"defaultType": "spot"}
     })
-    return exchange
 
 def calcular_sinal(df):
     ema_fast = ta.trend.ema_indicator(df['close'], window=10)
     ema_slow = ta.trend.ema_indicator(df['close'], window=21)
 
     avg_range = (df['high'] - df['low']).rolling(20).mean().iloc[-2]
+    if pd.isna(avg_range) or avg_range == 0:
+        return "⚠️ AGUARDANDO", "#808080"
 
     tendencia_alta = df['close'].iloc[-2] > ema_fast.iloc[-2]
     tendencia_macro = ema_fast.iloc[-2] > ema_slow.iloc[-2]
@@ -33,11 +35,11 @@ def calcular_sinal(df):
     upper_wick = df['high'].iloc[-2] - max(df['open'].iloc[-2], df['close'].iloc[-2])
 
     if tendencia_alta and tendencia_macro and not is_lateral and not is_elephant:
-        if lower_wick > body * 1.1:
+        if body > 0 and lower_wick > body * 1.1:
             return "🔥 CALL (FORTE)", "#00FF00"
 
     if not tendencia_alta and not tendencia_macro and not is_lateral and not is_elephant:
-        if upper_wick > body * 1.1:
+        if body > 0 and upper_wick > body * 1.1:
             return "❄️ PUT (FORTE)", "#FF0000"
 
     return "⚠️ AGUARDANDO", "#808080"
@@ -62,7 +64,7 @@ def get_data(symbol):
 
 @st.fragment(run_every="30s")
 def painel():
-    moedas = ['BTC/USDT:USDT', 'ETH/USDT:USDT', 'SOL/USDT:USDT', 'BNB/USDT:USDT']
+    moedas = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT']
     cols = st.columns(4)
 
     for i, coin in enumerate(moedas):
@@ -72,9 +74,8 @@ def painel():
                 status, cor = calcular_sinal(dados)
                 preco_atual = dados['close'].iloc[-1]
                 ultimo_candle = dados['timestamp'].iloc[-2]
-                nome = coin.split(':')[0]
 
-                st.subheader(f"💰 {nome}")
+                st.subheader(f"💰 {coin}")
                 st.metric("Preço", f"${preco_atual:,.2f}")
                 st.markdown(
                     f"<h2 style='color:{cor};'>{status}</h2>",
@@ -82,7 +83,7 @@ def painel():
                 )
                 st.caption(f"Candle fechado: {ultimo_candle}")
             else:
-                st.warning(f"⏳ {coin.split(':')[0]} — aguardando dados...")
+                st.warning(f"⏳ {coin} — aguardando dados...")
 
     agora = datetime.now().strftime("%H:%M:%S")
     st.caption(f"🕐 Última atualização: {agora} · Próxima em 30s")
