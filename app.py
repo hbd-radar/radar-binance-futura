@@ -9,11 +9,13 @@ st.title("🎯 Analista de Mercado 1M - Estratégia Futura")
 
 @st.cache_resource
 def get_exchange():
-    exchange = ccxt.bybit({        # ← BYBIT (sem bloqueio geo)
+    return ccxt.okx({
         "enableRateLimit": True,
-        "timeout": 10000,
+        "timeout": 15000,
+        "options": {
+            "defaultType": "spot"
+        }
     })
-    return exchange
 
 def calcular_sinal(df):
     ema_fast = ta.trend.ema_indicator(df['close'], window=10)
