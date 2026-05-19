@@ -3,24 +3,35 @@ import ccxt
 import pandas as pd
 import ta
 from datetime import datetime
+from streamlit_autorefresh import st_autorefresh
 
-# --- PASSO 2: DECIDIDO - NOME DO PROJETO FOCADO NA OKX ---
+# Configuração da página e título
 st.set_page_config(page_title="Tiro Supremo - Radar OKX", layout="wide")
 st.title("🎯 Tiro Supremo - Analista OKX")
 
+# Força o navegador a atualizar a página inteira a cada 30 segundos
+# Isso tira o peso do servidor do Render Free e evita travamentos
+st_autorefresh(interval=30000, key="radar_refresh")
+
 @st.cache_resource
 def get_exchange():
-    # Configuração robusta para a OKX
+    # Configuração com timeout estendido para 20s tolerar lentidão na nuvem
     return ccxt.okx({
         "enableRateLimit": True,
-        "timeout": 15000,
-        "options": {"defaultType": "swap"} # Garante o mercado de Futuros/Swap
+        "timeout": 20000,
+        "options": {"defaultType": "swap"},
+        "verbose": False
     })
 
 def calcular_sinal(df):
     try:
-        ema_fast = ta.trend.ema_indicator(df['close'], window=10)
-        ema_slow = ta.trend.ema_indicator(df['close'], window=21)
+        # PROTEÇÃO A: Se a API trouxer menos histórico do que o necessário para as EMAs
+        if len(df) < 22:
+            return "⚠️ AGUARDANDO DADOS", "#808080"
+
+        # PROTEÇÃO B: .fillna(0) impede que valores nulos quebrem as comparações lógicas
+        ema_fast = ta.trend.ema_indicator(df['close'], window=10).fillna(0)
+        ema_slow = ta.trend.ema_indicator(df['close'], window=21).fillna(0)
 
         avg_range = (df['high'] - df['low']).rolling(20).mean().iloc[-2]
         if pd.isna(avg_range) or avg_range == 0:
@@ -54,44 +65,36 @@ def get_data(symbol):
         exchange = get_exchange()
         bars = exchange.fetch_ohlcv(symbol, timeframe='1m', limit=50)
 
-        # Proteção: Se a exchange não devolver os dados, sai antes de quebrar
         if not bars or len(bars) < 50:
             return None
 
         df = pd.DataFrame(bars, columns=['time', 'open', 'high', 'low', 'close', 'vol'])
         df[['open','high','low','close','vol']] = df[['open','high','low','close','vol']].apply(pd.to_numeric)
-        
-        # Conversão segura de tempo
         df['timestamp'] = pd.to_datetime(df['time'], unit='ms').dt.strftime('%H:%M')
 
         return df
     except Exception as e:
-        # Se der erro de conexão, avisa discretamente sem derrubar o app
-        st.caption(f"Erro ao buscar {symbol}: {e}")
+        # Conversão segura em string para mitigar de vez o erro de NoneType do Render
+        st.caption(f"Aviso técnico de rede em {symbol}: {str(e)}")
         return None
 
-@st.fragment(run_every="30s")
 def painel():
-    # --- PASSO 2: SÍMBOLOS CORRIGIDOS EXCLUSIVAMENTE PARA OKX SWAP ---
     moedas = ['BTC/USDT:USDT-SWAP', 'ETH/USDT:USDT-SWAP', 'SOL/USDT:USDT-SWAP', 'BNB/USDT:USDT-SWAP']
     cols = st.columns(4)
 
     for i, coin in enumerate(moedas):
         with cols[i]:
             dados = get_data(coin)
-            nome_exibicao = coin.split('/')[0] # Vai mostrar apenas BTC, ETH, etc.
+            nome_exibicao = coin.split('/')[0]
 
             if dados is not None:
                 status, cor = calcular_sinal(dados)
-                
-                # Coleta usando f-strings para evitar o erro de NoneType + Str
                 preco_atual = dados['close'].iloc[-1]
                 ultimo_candle = dados['timestamp'].iloc[-2]
 
                 st.subheader(f"💰 {nome_exibicao}")
                 st.metric("Preço", f"${preco_atual:,.2f}")
                 
-                # Caixa visual estilizada para o sinal
                 st.markdown(
                     f"<div style='background-color: {cor}22; padding: 10px; border-radius: 5px; text-align: center; border: 1px solid {cor};'>"
                     f"<h3 style='color:{cor}; margin:0;'>{status}</h3>"
@@ -100,12 +103,11 @@ def painel():
                 )
                 st.caption(f"Confirmado às: {ultimo_candle}")
             else:
-                # Se os dados vierem vazios (None), o app mostra este aviso seguro:
-                st.warning(f"⏳ {nome_exibicao} — aguardando dados da OKX...")
+                st.warning(f"⏳ {nome_exibicao} — sem resposta da OKX...")
 
     agora = datetime.now().strftime("%H:%M:%S")
     st.markdown("---")
-    st.caption(f"🕐 Última varredura: {agora} · Atualização automática a cada 30s")
+    st.caption(f"🕐 Última varredura do servidor: {agora} · Atualização forçada a cada 30s")
 
-# Inicializa o app
+# Executa a montagem da tela
 painel()
