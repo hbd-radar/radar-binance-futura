@@ -1,4 +1,5 @@
 streamlit==1.45.1
-ccxt==4.3.90
-pandas==2.1.4
+ccxt==4.2.82
+pandas==2.2.0
 ta==0.11.0
+streamlit-autorefresh==1.2.1
