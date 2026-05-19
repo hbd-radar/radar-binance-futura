@@ -5,17 +5,13 @@ import ta
 from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
 
-# Configuração da página e título
 st.set_page_config(page_title="Tiro Supremo - Radar OKX", layout="wide")
 st.title("🎯 Tiro Supremo - Analista OKX")
 
-# Força o navegador a atualizar a página inteira a cada 30 segundos
-# Isso tira o peso do servidor do Render Free e evita travamentos
 st_autorefresh(interval=30000, key="radar_refresh")
 
 @st.cache_resource
 def get_exchange():
-    # Configuração com timeout estendido para 20s tolerar lentidão na nuvem
     return ccxt.okx({
         "enableRateLimit": True,
         "timeout": 20000,
@@ -25,11 +21,9 @@ def get_exchange():
 
 def calcular_sinal(df):
     try:
-        # PROTEÇÃO A: Se a API trouxer menos histórico do que o necessário para as EMAs
         if len(df) < 22:
             return "⚠️ AGUARDANDO DADOS", "#808080"
 
-        # PROTEÇÃO B: .fillna(0) impede que valores nulos quebrem as comparações lógicas
         ema_fast = ta.trend.ema_indicator(df['close'], window=10).fillna(0)
         ema_slow = ta.trend.ema_indicator(df['close'], window=21).fillna(0)
 
@@ -57,6 +51,7 @@ def calcular_sinal(df):
                 return "❄️ PUT (FORTE)", "#FF0000"
 
         return "⚠️ AGUARDANDO", "#808080"
+
     except Exception:
         return "⚠️ ERRO CÁLCULO", "#808080"
 
@@ -73,41 +68,46 @@ def get_data(symbol):
         df['timestamp'] = pd.to_datetime(df['time'], unit='ms').dt.strftime('%H:%M')
 
         return df
+
     except Exception as e:
-        # Conversão segura em string para mitigar de vez o erro de NoneType do Render
-        st.caption(f"Aviso técnico de rede em {symbol}: {str(e)}")
+        # Blindagem absoluta contra strings nulas
+        st.caption(f"Aviso técnico de rede em {str(symbol)}: {repr(e)}")
         return None
 
 def painel():
-    moedas = ['BTC/USDT:USDT-SWAP', 'ETH/USDT:USDT-SWAP', 'SOL/USDT:USDT-SWAP', 'BNB/USDT:USDT-SWAP']
+    moedas = [
+        'BTC/USDT:USDT-SWAP',
+        'ETH/USDT:USDT-SWAP',
+        'SOL/USDT:USDT-SWAP',
+        'BNB/USDT:USDT-SWAP'
+    ]
     cols = st.columns(4)
 
     for i, coin in enumerate(moedas):
         with cols[i]:
             dados = get_data(coin)
-            nome_exibicao = coin.split('/')[0]
+            nome = str(coin).split('/')[0]
 
             if dados is not None:
                 status, cor = calcular_sinal(dados)
                 preco_atual = dados['close'].iloc[-1]
                 ultimo_candle = dados['timestamp'].iloc[-2]
 
-                st.subheader(f"💰 {nome_exibicao}")
+                st.subheader(f"💰 {nome}")
                 st.metric("Preço", f"${preco_atual:,.2f}")
-                
                 st.markdown(
-                    f"<div style='background-color: {cor}22; padding: 10px; border-radius: 5px; text-align: center; border: 1px solid {cor};'>"
+                    f"<div style='background-color:{cor}22; padding:10px; "
+                    f"border-radius:5px; text-align:center; border:1px solid {cor};'>"
                     f"<h3 style='color:{cor}; margin:0;'>{status}</h3>"
                     f"</div>",
                     unsafe_allow_html=True
                 )
                 st.caption(f"Confirmado às: {ultimo_candle}")
             else:
-                st.warning(f"⏳ {nome_exibicao} — sem resposta da OKX...")
+                st.warning(f"⏳ {nome} — sem resposta da OKX...")
 
     agora = datetime.now().strftime("%H:%M:%S")
     st.markdown("---")
-    st.caption(f"🕐 Última varredura do servidor: {agora} · Atualização forçada a cada 30s")
+    st.caption(f"🕐 Última varredura: {agora} · Atualização a cada 30s")
 
-# Executa a montagem da tela
 painel()
